@@ -1,8 +1,9 @@
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import argparse
 import re
 import os
+import sys
 from deep_translator import GoogleTranslator
 
 class Localizer:
@@ -52,7 +53,7 @@ class Localizer:
             return text
 
     def setup_ui(self):
-        self.root.title("Paradox Localizer 1.2")
+        self.root.title("Paradox Localizer 1.3")
         self.root.geometry("1000x850")
         self.root.configure(bg="#121212")
 
@@ -86,7 +87,7 @@ class Localizer:
         self.btn_frame = tk.Frame(self.main_frame, bg="#121212")
         self.btn_frame.pack(fill="x", pady=10)
 
-        self.btn_verify = tk.Button(self.btn_frame, text="🚀 AUTO-VERIFY", command=self.toggle_auto, 
+        self.btn_verify = tk.Button(self.btn_frame, text="AUTO-VERIFY", command=self.toggle_auto, 
                                    bg="#d32f2f", fg="white", font=("Consolas", 12, "bold"), 
                                    relief="flat", pady=15, cursor="hand2")
         self.btn_verify.pack(side="left", fill="x", expand=True, padx=(0, 5))
@@ -172,10 +173,31 @@ class Localizer:
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("-path", required=True)
+    p.add_argument("path", type=str, nargs='?', default=None, help="Путь к файлу локализации")
     p.add_argument("-ref", default=None)
     p.add_argument("-start", type=int, default=0)
     args = p.parse_args()
+    if not args.path and len(sys.argv) > 1:
+        if sys.argv[1].lower().endswith('.yml'):
+            args.path = sys.argv[1]
+    if not args.path:
+        temp_root = tk.Tk()
+        temp_root.withdraw()  # Скрываем основное окно лога
+        # Поднимаем окно выбора файла на передний план
+        temp_root.attributes("-topmost", True)
+        
+        selected_path = filedialog.askopenfilename(
+            title="Выберите файл .yml для перевода",
+            filetypes=[("Paradox Localization", "*.yml")]
+        )
+        
+        if selected_path:
+            args.path = selected_path
+        else:
+            print("Файл не выбран. Завершение работы.")
+            sys.exit()
+            
+        temp_root.destroy()
     root = tk.Tk()
     app = Localizer(root, args.path, args.ref, args.start)
     root.mainloop()
