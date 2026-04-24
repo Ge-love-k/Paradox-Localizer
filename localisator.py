@@ -153,7 +153,7 @@ class LocalizerPro:
             self.txt_input.insert("1.0", translated)
             self.root.update()
         self.next_line()
-        self.root.after(400, self.run_auto)
+        self.root.after(100, self.run_auto)
 
     def next_line(self):
         if self.current_index >= len(self.lines): return
