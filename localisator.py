@@ -19,7 +19,7 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
         super().__init__()
         self.TkdndVersion = TkinterDnD._require(self)
         
-        self.title("G-LOCALIZER ULTRA v1.4")
+        self.title("G-LOCALIZER ULTRA v1.4 - alpha 2")
         self.geometry("1200x850")
         self.configure(fg_color="#000000")
         
@@ -39,6 +39,7 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
         self.line_pattern = re.compile(r'^(\s*[\w\.\-]+)(:\d*\s*)"(.*)"')
         self.var_pattern = re.compile(r'(\$[^\$]+\$|§.|\[[^\]]+\]|\\n)')
         self.cyrillic_pattern = re.compile(r'[а-яА-ЯёЁ]')
+        self.shutdown_after = ctk.BooleanVar(value=False)
 
         self.setup_ui()
         self.setup_drag()
@@ -64,7 +65,7 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
         self.title_bar = ctk.CTkFrame(self, fg_color="#000000", height=60, corner_radius=0)
         self.title_bar.pack(fill="x", side="top")
         
-        ctk.CTkLabel(self.title_bar, text="SFN-Translator   |   Paradox Localizer v1.4", 
+        ctk.CTkLabel(self.title_bar, text="SFN-Translator   |   Paradox Localizer v1.4 - alpha 2", 
                      text_color="#555555", font=("Segoe UI", 10, "bold")).pack(side="left", padx=40)
         
         ctk.CTkButton(self.title_bar, text="✕", fg_color="transparent", hover_color="#E81123",
@@ -78,6 +79,7 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
         self.side_panel = ctk.CTkFrame(self.main_area, fg_color="#080808", width=250, corner_radius=0)
         self.side_panel.pack(side="left", fill="y", padx=(20, 0), pady=20)
         self.side_panel.pack_propagate(False)
+
 
         ctk.CTkLabel(self.side_panel, text="ENGINE SETTINGS", text_color=self.accent, 
                      font=("Segoe UI", 9, "bold")).pack(pady=(30, 20))
@@ -117,6 +119,9 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
                                       text_color=self.accent, font=("Segoe UI", 12, "bold"),
                                       width=120, height=45, command=self.toggle_auto)
         self.btn_auto.pack(side="right", padx=15)
+        self.shutdown_sw = ctk.CTkSwitch(self.side_panel, text="SHUTDOWN ON END", 
+                                 variable=self.shutdown_after, progress_color="#FF3B30")
+        self.shutdown_sw.pack(pady=10, padx=30, anchor="w")
 
     def create_field(self, title, name, h, active=False):
         ctk.CTkLabel(self.card, text=title, text_color=self.accent if active else "#444444", 
@@ -212,7 +217,16 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
                 self.txt_input.insert("1.0", eng)
                 return
             self.current_index += 1
+        self.finish_work()
         messagebox.showinfo("SFN-Translator", "WORK COMPLETE")
+    def finish_work(self):
+        """Логика завершения работы"""
+        
+        if self.shutdown_after.get():
+            # Запускаем выключение через 60 секунд
+            # /s - завершение работы, /t 60 - таймер
+            os.system("shutdown /s /t 60")
+            messagebox.showwarning("SYSTEM", "PC will shutdown in 60s! Use 'shutdown -a' in CMD to cancel.")
 
     def apply_start_index(self):
         try:
