@@ -41,7 +41,7 @@ DEFAULT_SOCIAL_URLS = {
 
 ctk.set_appearance_mode("dark")
 
-class Localizer(ctk.CTk, TkinterDnD.DnDWrapper): #TODO: Добавить кнопку моего дискорд-сервера в виде иконки в углу для поддержки проекта
+class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self, edit_path=None):
         super().__init__()
         self.TkdndVersion = TkinterDnD._require(self)
@@ -67,6 +67,7 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper): #TODO: Добавить кно�
         self.var_pattern = re.compile(r'(\$[^\$]+\$|§.|\[[^\]]+\]|\\n)')
         self.cyrillic_pattern = re.compile(r'[а-яА-ЯёЁ]')
         self.shutdown_after = ctk.BooleanVar(value=False)
+        self.side_panel_visible = True
 
         self.setup_ui()
         self.setup_drag()
@@ -95,6 +96,13 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper): #TODO: Добавить кно�
         
         ctk.CTkLabel(self.title_bar, text="SFN-LOCALIZER v1.4", 
                      text_color="#555555", font=("Segoe UI", 10, "bold")).pack(side="left", padx=40)
+
+        settings_icon_path = Path(__file__).resolve().parent / "icons" / "settings.png"
+        if settings_icon_path.exists():
+            self.icon_settings = ctk.CTkImage(light_image=Image.open(settings_icon_path), size=(16, 16))
+        else:
+            self.icon_settings = ctk.CTkImage(light_image=self._build_icon("#888888", "S"), size=(16, 16))
+
         ctk.CTkButton(self.title_bar, text="✕", fg_color="transparent", hover_color="#E81123",
                       text_color="#555555", width=60, height=60, corner_radius=0,
                       font=("Segoe UI", 12), command=self.destroy).pack(side="right")
@@ -105,6 +113,13 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper): #TODO: Добавить кно�
         self.social_bar = ctk.CTkFrame(self, fg_color="transparent")
         self.social_bar.place(relx=0.99, rely=0.99, anchor="se")
         self.social_bar.lift()
+
+        self.settings_button = ctk.CTkButton(self, text="", image=self.icon_settings, width=40, height=40,
+                                              fg_color="#222222", hover_color="#444444", corner_radius=12,
+                                              border_width=1, border_color="#555555",
+                                              command=self.toggle_side_panel)
+        self.settings_button.place(relx=0.01, rely=0.99, anchor="sw")
+        self.settings_button.lift()
 
         self.side_panel = ctk.CTkFrame(self.main_area, fg_color="#080808", width=250, corner_radius=0)
         self.side_panel.pack(side="left", fill="y", padx=(20, 0), pady=20)
@@ -220,6 +235,22 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper): #TODO: Добавить кно�
             self.geometry(f"+{x}+{y}")
         self.title_bar.bind("<Button-1>", start_move)
         self.title_bar.bind("<B1-Motion>", do_move)
+
+    def toggle_side_panel(self):
+        if self.side_panel_visible:
+            self.side_panel.pack_forget()
+            self.side_panel_visible = False
+        else:
+            self.side_panel.pack(side="left", fill="y", padx=(20, 0), pady=20)
+            self.side_panel_visible = True
+
+    def toggle_side_panel(self):
+        if self.side_panel_visible:
+            self.side_panel.pack_forget()
+            self.side_panel_visible = False
+        else:
+            self.side_panel.pack(side="left", fill="y", padx=(20, 0), pady=20)
+            self.side_panel_visible = True
 
     def _build_icon(self, bg_color, letter):
         img = Image.new("RGBA", (16, 16), bg_color)
