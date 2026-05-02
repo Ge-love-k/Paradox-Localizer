@@ -11,15 +11,28 @@ from ctypes import windll
 GWL_EXSTYLE = -20
 WS_EX_APPWINDOW = 0x00040000
 WS_EX_TOOLWINDOW = 0x00000080
+LANGUAGES = ["RU", "EN", "DE", "FR", "ES", "BR", "JA", "KO", "PO", "ZH-CN", "auto"]
+LANGUAGES_ADJ = {
+    "RU": "l_russian",
+    "EN": "l_english",
+    "DE": "l_german",
+    "FR": "l_french",
+    "ES": "l_spanish",
+    "BR": "l_braz_por",
+    "JA": "l_japanese",
+    "KO": "l_korean",
+    "ZH-CN": "l_simp_chinese",
+    "PO": "l_polish"
+}
 
 ctk.set_appearance_mode("dark")
 
-class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
+class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self, edit_path=None):
         super().__init__()
         self.TkdndVersion = TkinterDnD._require(self)
         
-        self.title("G-LOCALIZER ULTRA v1.4 - alpha 2")
+        self.title("G-LOCALIZER ULTRA v1.4 - beta")
         self.geometry("1200x850")
         self.configure(fg_color="#000000")
         
@@ -33,7 +46,7 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
         self.lines = []
         self.is_auto = False
         
-        self.skip_translated = ctk.BooleanVar(value=True)
+        self.skip_translated = ctk.BooleanVar(value=False)
         self.start_line_index = ctk.StringVar(value="0")
         
         self.line_pattern = re.compile(r'^(\s*[\w\.\-]+)(:\d*\s*)"(.*)"')
@@ -65,7 +78,7 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
         self.title_bar = ctk.CTkFrame(self, fg_color="#000000", height=60, corner_radius=0)
         self.title_bar.pack(fill="x", side="top")
         
-        ctk.CTkLabel(self.title_bar, text="SFN-Translator   |   Paradox Localizer v1.4 - alpha 2", 
+        ctk.CTkLabel(self.title_bar, text="SFN-Translator   |   Paradox Localizer v1.4 - beta", 
                      text_color="#555555", font=("Segoe UI", 10, "bold")).pack(side="left", padx=40)
         
         ctk.CTkButton(self.title_bar, text="✕", fg_color="transparent", hover_color="#E81123",
@@ -103,6 +116,10 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
         
         self.create_field("ORIGINAL", "txt_orig", 110)
         self.create_field("TRANSLATION", "txt_input", 160, active=True)
+        self.filename = ctk.CTkLabel(self.card, text="", text_color="#333333", font=("Consolas", 15))
+        self.filename.pack(side="bottom", pady=10)
+
+        self.filename.configure(text=os.path.basename(self.edit_path) if self.edit_path else "")
 
         self.footer = ctk.CTkFrame(self.card, fg_color="transparent")
         self.footer.pack(fill="x", side="bottom", padx=40, pady=35)
@@ -119,9 +136,27 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
                                       text_color=self.accent, font=("Segoe UI", 12, "bold"),
                                       width=120, height=45, command=self.toggle_auto)
         self.btn_auto.pack(side="right", padx=15)
+        self.backBtn = ctk.CTkButton(self.footer, text="← BACK", fg_color="#222222", command=self.go_back, hover_color="#333333",
+                                      font=("Segoe UI", 12, "bold"), width=120, height=45, text_color=self.accent)
+        self.backBtn.pack(side="right")
         self.shutdown_sw = ctk.CTkSwitch(self.side_panel, text="SHUTDOWN ON END", 
                                  variable=self.shutdown_after, progress_color="#FF3B30")
         self.shutdown_sw.pack(pady=10, padx=30, anchor="w")
+        self.firstLangLabel = ctk.CTkLabel(self.side_panel, text="SOURCE LANGUAGE:", text_color="#555555", font=("Segoe UI", 15, "bold"))
+        self.firstLangLabel.pack(pady=(20, 5), padx=30, anchor="w")
+        self.firstLang = ctk.CTkComboBox(self.side_panel, values=LANGUAGES, state="readonly", fg_color="#151515", border_color="#333333")
+        self.firstLang.pack(pady=10, padx=30, anchor="w")
+        self.firstLang.set('EN')
+        self.secondLangLabel = ctk.CTkLabel(self.side_panel, text="TARGET LANGUAGE:", text_color="#555555", font=("Segoe UI", 15, "bold"))
+        self.secondLangLabel.pack(pady=(20, 5), padx=30, anchor="w")
+        self.secondLang = ctk.CTkComboBox(self.side_panel, values=LANGUAGES[:-1], state="readonly", fg_color="#151515", border_color="#333333")
+        self.secondLang.pack(pady=10, padx=30, anchor="w")
+        self.secondLang.set('RU')
+        self.tweak_name_and_l = ctk.CTkButton(self.side_panel, text="Change file name and l_[lang]", fg_color="#222222", command=self.tweak_name_and_l_lang, hover_color="#333333")
+        self.tweak_name_and_l.pack(pady=5, padx=30, fill="x")
+        self.openFileBtn = ctk.CTkButton(self.side_panel, text="Open current file", fg_color="#222222", command=self.open_current_file, hover_color="#333333")
+        self.openFileBtn.pack(pady=5, padx=30, fill="x")
+
 
     def create_field(self, title, name, h, active=False):
         ctk.CTkLabel(self.card, text=title, text_color=self.accent if active else "#444444", 
@@ -170,7 +205,7 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
             temp_text = temp_text.replace(v, f" __{i}__ ", 1)
             
         try:
-            res_obj = self.translator.translate(temp_text, src='en', dest='ru')
+            res_obj = self.translator.translate(temp_text, src=self.firstLang.get(), dest=self.secondLang.get())
             res = res_obj.text
             
             for i, v in enumerate(vars_found):
@@ -248,8 +283,40 @@ class LocalizerUltra14(ctk.CTk, TkinterDnD.DnDWrapper):
             self.current_index = 0
             with open(self.edit_path, 'r', encoding='utf-8-sig') as f: 
                 self.lines = f.readlines()
+            self.filename.configure(text=os.path.basename(self.edit_path))
+            self.show_current_line()
+    def tweak_name_and_l_lang(self):
+        """Изменяет название файла на l_[targetlang].yml и меняет l_[sourcelang] на l_[targetlang] в файле"""
+        if not self.edit_path: return
+        target_lang = self.secondLang.get()
+        if target_lang == "auto":
+            messagebox.showerror("Error", "Please select a target language other than 'auto'.")
+            return
+        
+        new_path = re.sub(r'l_[\w-]+\.yml$', f'{LANGUAGES_ADJ[target_lang]}.yml', self.edit_path)
+        try:
+            os.rename(self.edit_path, new_path)
+            self.edit_path = new_path
+            self.filename.configure(text=os.path.basename(self.edit_path))
+            
+            self.lines[0] = f'{LANGUAGES_ADJ[target_lang]}:\n'
+            
+            with open(self.edit_path, 'w', encoding='utf-8-sig') as f:
+                f.writelines(self.lines)
+            
+            messagebox.showinfo("Success", f"File renamed to {os.path.basename(new_path)} and l_[sourcelang] replaced.")
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred: {e}")
+    def open_current_file(self):
+        """Открывает текущий файл"""
+        if not self.edit_path: return
+        os.startfile(self.edit_path)
+    def go_back(self):
+        """Открывает предыдущую строку для редактирования"""
+        if self.current_index > 1:
+            self.current_index -= 2
             self.show_current_line()
 
 if __name__ == "__main__":
-    app = LocalizerUltra14()
+    app = Localizer()
     app.mainloop()
