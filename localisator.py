@@ -1,9 +1,15 @@
+import json
 import math
+from PIL import Image, ImageDraw
 import customtkinter as ctk
 from tkinter import messagebox
 from tkinterdnd2 import DND_FILES, TkinterDnD
 import re
 import os
+import urllib.request
+import urllib.error
+import webbrowser
+from pathlib import Path
 from googletrans import Translator
 from ctypes import windll
 
@@ -25,14 +31,22 @@ LANGUAGES_ADJ = {
     "PO": "l_polish"
 }
 
+SOCIAL_CONFIG_FILE = "social_links.json"
+SOCIAL_CONFIG_URL = "https://gist.githubusercontent.com/Ge-love-k/52e99ea1315ff855ea6273029cdc19a3/raw/f8ec5d93b9c235ea48dfe3d1b13bf6aa6896d3f9/links.json"
+DEFAULT_SOCIAL_URLS = {
+    "Telegram": "https://t.me/your_username",
+    "Discord": "https://discord.gg/your_invite",
+    "Steam": "https://store.steampowered.com/"
+}
+
 ctk.set_appearance_mode("dark")
 
-class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
+class Localizer(ctk.CTk, TkinterDnD.DnDWrapper): #TODO: Добавить кнопку моего дискорд-сервера в виде иконки в углу для поддержки проекта
     def __init__(self, edit_path=None):
         super().__init__()
         self.TkdndVersion = TkinterDnD._require(self)
         
-        self.title("G-LOCALIZER ULTRA v1.4 - beta")
+        self.title("SFN-LOCALIZER v1.4")
         self.geometry("1200x850")
         self.configure(fg_color="#000000")
         
@@ -61,6 +75,7 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
         self.drop_target_register(DND_FILES)
         self.dnd_bind('<<Drop>>', self.handle_drop)
         self.translator = Translator()
+        self.social_urls = self.load_social_urls()
 
     def set_appwindow(self):
         """Фикс отображения в таскбаре для overrideredirect окон"""
@@ -78,9 +93,8 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
         self.title_bar = ctk.CTkFrame(self, fg_color="#000000", height=60, corner_radius=0)
         self.title_bar.pack(fill="x", side="top")
         
-        ctk.CTkLabel(self.title_bar, text="SFN-Translator   |   Paradox Localizer v1.4 - beta", 
+        ctk.CTkLabel(self.title_bar, text="SFN-LOCALIZER v1.4", 
                      text_color="#555555", font=("Segoe UI", 10, "bold")).pack(side="left", padx=40)
-        
         ctk.CTkButton(self.title_bar, text="✕", fg_color="transparent", hover_color="#E81123",
                       text_color="#555555", width=60, height=60, corner_radius=0,
                       font=("Segoe UI", 12), command=self.destroy).pack(side="right")
@@ -88,6 +102,9 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
         self.main_area = ctk.CTkFrame(self, fg_color="transparent")
         self.main_area.pack(fill="both", expand=True)
 
+        self.social_bar = ctk.CTkFrame(self, fg_color="transparent")
+        self.social_bar.place(relx=0.99, rely=0.99, anchor="se")
+        self.social_bar.lift()
 
         self.side_panel = ctk.CTkFrame(self.main_area, fg_color="#080808", width=250, corner_radius=0)
         self.side_panel.pack(side="left", fill="y", padx=(20, 0), pady=20)
@@ -157,6 +174,32 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
         self.openFileBtn = ctk.CTkButton(self.side_panel, text="Open current file", fg_color="#222222", command=self.open_current_file, hover_color="#333333")
         self.openFileBtn.pack(pady=5, padx=30, fill="x")
 
+        telegram_icon_path = Path(__file__).resolve().parent / "icons" / "telegram.png"
+        discord_icon_path = Path(__file__).resolve().parent / "icons" / "discord.png"
+        steam_icon_path = Path(__file__).resolve().parent / "icons" / "_steam.png"
+
+        if telegram_icon_path.exists():
+            self.icon_telegram = ctk.CTkImage(light_image=Image.open(telegram_icon_path), size=(16, 16))
+        else:
+            self.icon_telegram = ctk.CTkImage(light_image=self._build_icon("#2AABEE", "T"), size=(16, 16))
+
+        if discord_icon_path.exists():
+            self.icon_discord = ctk.CTkImage(light_image=Image.open(discord_icon_path), size=(16, 16))
+        else:
+            self.icon_discord = ctk.CTkImage(light_image=self._build_icon("#7289DA", "D"), size=(16, 16))
+
+        if steam_icon_path.exists():
+            self.icon_steam = ctk.CTkImage(light_image=Image.open(steam_icon_path), size=(16, 16))
+        else:
+            self.icon_steam = ctk.CTkImage(light_image=self._build_icon("#171A21", "S"), size=(16, 16))
+
+        ctk.CTkButton(self.social_bar, text="", image=self.icon_telegram, width=34, height=34, fg_color="#111111",
+                      hover_color="#1C7ED6", command=lambda: self.open_social("Telegram")).pack(side="left", padx=(0, 8), pady=4)
+        ctk.CTkButton(self.social_bar, text="", image=self.icon_discord, width=34, height=34, fg_color="#111111",
+                      hover_color="#3A3C41", command=lambda: self.open_social("Discord")).pack(side="left", padx=(0, 8), pady=4)
+        ctk.CTkButton(self.social_bar, text="", image=self.icon_steam, width=34, height=34, fg_color="#111111",
+                      hover_color="#444444", command=lambda: self.open_social("Steam")).pack(side="left", pady=4)
+
 
     def create_field(self, title, name, h, active=False):
         ctk.CTkLabel(self.card, text=title, text_color=self.accent if active else "#444444", 
@@ -177,6 +220,22 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
             self.geometry(f"+{x}+{y}")
         self.title_bar.bind("<Button-1>", start_move)
         self.title_bar.bind("<B1-Motion>", do_move)
+
+    def _build_icon(self, bg_color, letter):
+        img = Image.new("RGBA", (16, 16), bg_color)
+        draw = ImageDraw.Draw(img)
+        if letter == "T":
+            draw.rectangle((4, 3, 11, 5), fill="white")
+            draw.rectangle((7, 3, 9, 14), fill="white")
+        elif letter == "D":
+            draw.rectangle((4, 4, 11, 11), fill="white")
+            draw.rectangle((4, 5, 6, 10), fill=bg_color)
+            draw.rectangle((8, 5, 10, 10), fill=bg_color)
+        elif letter == "S":
+            draw.rectangle((4, 4, 11, 6), fill="white")
+            draw.rectangle((4, 8, 11, 10), fill="white")
+            draw.rectangle((4, 11, 11, 13), fill="white")
+        return img
 
     def toggle_auto(self):
         self.is_auto = not self.is_auto
@@ -254,6 +313,63 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
             self.current_index += 1
         self.finish_work()
         messagebox.showinfo("SFN-Translator", "WORK COMPLETE")
+
+    def load_social_urls(self):
+        config_path = Path(__file__).resolve().parent / SOCIAL_CONFIG_FILE
+        urls = DEFAULT_SOCIAL_URLS.copy()
+        key_map = {
+            'telegram': 'Telegram',
+            'discord': 'Discord',
+            'steam': 'Steam'
+        }
+
+        def normalize_data(data):
+            if not isinstance(data, dict):
+                return {}
+            if 'links' in data and isinstance(data['links'], dict):
+                data = data['links']
+            normalized = {}
+            for key, value in data.items():
+                if not isinstance(value, str):
+                    continue
+                normalized[key_map.get(key.lower(), key)] = value
+            return normalized
+
+        remote_loaded = False
+        try:
+            with urllib.request.urlopen(SOCIAL_CONFIG_URL, timeout=5) as resp:
+                remote_data = json.loads(resp.read().decode('utf-8'))
+                remote_urls = normalize_data(remote_data)
+                if remote_urls:
+                    urls.update(remote_urls)
+                    remote_loaded = True
+        except (urllib.error.URLError, ValueError, Exception):
+            pass
+
+        if not remote_loaded and config_path.exists():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    local_data = json.load(f)
+                urls.update(normalize_data(local_data))
+            except Exception:
+                pass
+        elif not config_path.exists():
+            try:
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(DEFAULT_SOCIAL_URLS, f, ensure_ascii=False, indent=4)
+            except Exception:
+                pass
+
+        return urls
+
+    def open_social(self, site_name):
+        """Открывает ссылку на соцсеть из загруженного JSON-конфига."""
+        url = self.social_urls.get(site_name)
+        if url:
+            webbrowser.open(url)
+        else:
+            messagebox.showwarning("Соцсеть не настроена", f"URL для {site_name} не задан в {SOCIAL_CONFIG_FILE}.")
+
     def finish_work(self):
         """Логика завершения работы"""
         
