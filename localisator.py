@@ -1,5 +1,7 @@
+from asyncio import subprocess
 import json
 import math
+import sys
 from PIL import Image, ImageDraw
 import customtkinter as ctk
 from tkinter import messagebox
@@ -9,9 +11,11 @@ import os
 import urllib.request
 import urllib.error
 import webbrowser
+import fetch
 from pathlib import Path
 from googletrans import Translator
 from ctypes import windll
+import requests
 
 # Константы для фикса таскбара (WinAPI)
 GWL_EXSTYLE = -20
@@ -38,15 +42,43 @@ DEFAULT_SOCIAL_URLS = {
     "Discord": "https://discord.gg/your_invite",
     "Steam": "https://store.steampowered.com/"
 }
+CURRENT_VERSION = "1.4.1"
 
 ctk.set_appearance_mode("dark")
+
+def resource_path(relative_path):
+    """ Получает абсолютный путь к ресурсам, работает и в dev, и в PyInstaller """
+    try:
+        # PyInstaller создает временную папку _MEIxxxx
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+# Пример использования для твоих файлов:
+json_path = resource_path("social_links.json")
+updater_path = resource_path("update.exe")
+
+def check_for_updates():
+    try: 
+        response = requests.get("http://45.81.253.48:8000/check_version", timeout=5)
+        data = response.json()
+        if data["version"] != CURRENT_VERSION:
+            answer = messagebox.askyesno("Update Available", f"A new version ({data['version']}) is available. Do you want to update?")
+            if answer:
+                exe_name = os.path.basename(sys.executable)
+                subprocess.Popen([updater_path, data["url"], exe_name])
+                sys.exit() # Закрываем основную программу
+    except Exception as e:
+        print(f"Update check failed: {e}")
+        pass
 
 class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self, edit_path=None):
         super().__init__()
         self.TkdndVersion = TkinterDnD._require(self)
         
-        self.title("SFN-LOCALIZER v1.4")
+        self.title(f"SFN-LOCALIZER v{CURRENT_VERSION}")
         self.geometry("1200x850")
         self.configure(fg_color="#000000")
         
@@ -77,6 +109,7 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
         self.dnd_bind('<<Drop>>', self.handle_drop)
         self.translator = Translator()
         self.social_urls = self.load_social_urls()
+        fetch.send_analytics()
 
     def set_appwindow(self):
         """Фикс отображения в таскбаре для overrideredirect окон"""
@@ -94,7 +127,7 @@ class Localizer(ctk.CTk, TkinterDnD.DnDWrapper):
         self.title_bar = ctk.CTkFrame(self, fg_color="#000000", height=60, corner_radius=0)
         self.title_bar.pack(fill="x", side="top")
         
-        ctk.CTkLabel(self.title_bar, text="SFN-LOCALIZER v1.4", 
+        ctk.CTkLabel(self.title_bar, text=f'SFN-LOCALIZER v{CURRENT_VERSION}', 
                      text_color="#555555", font=("Segoe UI", 10, "bold")).pack(side="left", padx=40)
 
         settings_icon_path = Path(__file__).resolve().parent / "icons" / "settings.png"
